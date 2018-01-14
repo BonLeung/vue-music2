@@ -24,6 +24,17 @@ export default {
     .icon
       display: inline-block;
       vertical-align: top;
+      margin-top: 6px;
+      margin-right: 9px;
+      width: 30px;
+      height: 32px;
+      bg-image('logo');
+      background-size: 30px 32px;
+    .text
+      display: inline-block;
+      vertical-align: top;
+      line-height: 44px;
+      font-size: $font-size-large;
 
 
 </style>
