@@ -3,7 +3,8 @@ export function addClass(el, className) {
     return
   }
   let newClass = el.className.split(' ')
-  return newClass.push(className).join(' ')
+  newClass.push(className)
+  el.className = newClass.join(' ')
 }
 
 function hasClass(el, className) {
