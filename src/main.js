@@ -15,7 +15,7 @@ Vue.config.productionTip = false
 Vue.use(VueLazyLoad, {
   loading: require('common/image/default.png')
 })
-console.log(store)
+
 /* eslint-disable no-new */
 new Vue({
   el: '#app',
