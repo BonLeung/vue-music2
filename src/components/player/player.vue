@@ -24,12 +24,14 @@
         <div class="bottom">
           <div class="progress-wrapper">
             <span class="time time-l">{{format(currentTime)}}</span>
-            <div class="progress-bar-wrapper"></div>
+            <div class="progress-bar-wrapper">
+              <progress-bar :percent="percent" @percentChange="onProgressBarChange"></progress-bar>
+            </div>
             <span class="time time-r">{{format(currentSong.duration)}}</span>
           </div>
           <div class="operators">
             <div class="icon i-left">
-              <i class="icon-sequence"></i>
+              <i :class="iconMode" @click="changeMode"></i>
             </div>
             <div class="icon i-left" :class="disableCls">
               <i class="icon-prev" @click="prev"></i>
@@ -57,20 +59,26 @@
           <p class="desc">{{currentSong.singer}}</p>
         </div>
         <div class="control">
-          <i :class="miniIcon" @click.stop.prevent="togglePlaying"></i>
+          <progress-circle :radius="radius" :percent="percent">
+            <i class="icon-mini" :class="miniIcon" @click.stop.prevent="togglePlaying"></i>
+          </progress-circle>
         </div>
         <div class="control">
           <i class="icon-playlist"></i>
         </div>
       </div>
     </transition>
-    <audio :src="currentSong.url" ref="audio" @canplay="ready" @error="error" @timeupdate="updateTime"></audio>
+    <audio :src="currentSong.url" ref="audio" @canplay="ready" @error="error" @timeupdate="updateTime" @ended="end"></audio>
   </div>
 </template>
 
 <script>
 import { mapGetters, mapMutations } from 'vuex'
+import { playMode } from 'common/js/config'
+import { shuffle } from 'common/js/util'
 import animations from 'create-keyframe-animation'
+import ProgressBar from 'base/progress-bar/progress-bar'
+import ProgressCircle from 'base/progress-circle/progress-circle'
 
 export default {
   data() {
@@ -78,6 +86,9 @@ export default {
       songReady: false,
       currentTime: 0
     }
+  },
+  created() {
+    this.radius = 32
   },
   computed: {
     playIcon() {
@@ -92,18 +103,30 @@ export default {
     disableCls() {
       return this.songReady ? '' : 'disable'
     },
+    percent() {
+      return this.currentTime / this.currentSong.duration
+    },
+    iconMode() {
+      return this.mode === playMode.sequence ? 'icon-sequence' : this.mode === playMode.loop ? 'icon-loop' : 'icon-random'
+    },
     ...mapGetters([
       'fullScreen',
       'playList',
       'currentSong',
       'playing',
-      'currentIndex'
+      'currentIndex',
+      'mode',
+      'sequenceList'
     ])
   },
   watch: {
-    currentSong() {
+    currentSong(newSong, oldSong) {
+      if(newSong.id === oldSong.id) {
+        return
+      }
       this.$nextTick(() => {
         this.$refs.audio.play()
+        this.currentSong.getLyric()
       })
     },
     playing(newPlayingState) {
@@ -174,6 +197,9 @@ export default {
       if (index === -1) {
         index = this.playList.length - 1
       }
+      if (!this.playing) {
+        this.togglePlaying()
+      }
       this.setCurrentIndex(index)
       this.songReady = false
     },
@@ -184,6 +210,9 @@ export default {
       let index = this.currentIndex + 1
       if (index === this.playList.length) {
         index = 1
+      }
+      if (!this.playing) {
+        this.togglePlaying()
       }
       this.setCurrentIndex(index)
       this.songReady = false
@@ -200,10 +229,49 @@ export default {
     format(interval) {
       interval = interval | 0
       let minute = (interval / 60 | 0)
-      let second = interval % 60
-      minute = minute.toString().padStart(2, '0')
-      second = second.toString().padStart(2, '0')
+      let second = this._pad(interval % 60)
       return `${minute}:${second}`
+    },
+    onProgressBarChange(percent) {
+      this.$refs.audio.currentTime = this.currentSong.duration * percent
+      if (!this.playing) {
+        this.togglePlaying()
+      }
+    },
+    changeMode() {
+      const mode = (this.mode + 1) % 3
+      this.setPlayMode(mode)
+      let list = null
+      if (mode === playMode.random) {
+        list = shuffle(this.sequenceList)
+      } else {
+        list = this.sequenceList
+      }
+      this.resetCurrentIndex(list)
+      this.setPlayList(list)
+    },
+    resetCurrentIndex(list) {
+      let index = list.findIndex(item => {
+        return item.id === this.currentSong.id
+      })
+      this.setCurrentIndex(index)
+    },
+    end() {
+      if (this.mode === playMode.loop) {
+        this.loop()
+      } else {
+        this.next()
+      }
+    },
+    loop() {
+      this.$refs.audio.currentTime = 0
+      this.$refs.audio.play()
+    },
+    _pad(num, n = 2) {
+      while(num.toString().length < n) {
+        num = '0' + num
+      }
+      return num
     },
     _getPosAndScale() {
       let targetWidth = 40
@@ -223,8 +291,14 @@ export default {
     ...mapMutations({
       setFullScreen: 'SET_FULL_SCREEN',
       setPlayingState: 'SET_PLAYING',
-      setCurrentIndex: 'SET_CURRENT_INDEX'
+      setCurrentIndex: 'SET_CURRENT_INDEX',
+      setPlayMode: 'SET_PLAY_MODE',
+      setPlayList: 'SET_PLAYLIST'
     })
+  },
+  components: {
+    ProgressBar,
+    ProgressCircle
   }
 }
 </script>
@@ -319,6 +393,24 @@ export default {
       position: absolute;
       bottom: 50px;
       width: 100%;
+      .progress-wrapper
+        display: flex;
+        align-items: center;
+        width: 80%;
+        margin: 0 auto;
+        padding: 10px 0;
+        .time
+          color: $color-text;
+          font-size: $font-size-small;
+          flex: 0 0 30px;
+          width: 30px;
+          line-height: 30px;
+          &.time-l
+            text-align: left;
+          &.time-r
+            text-align: right;
+        .progress-bar-wrapper
+          flex: 1;
       .operators
         display: flex;
         align-items: center;
@@ -390,7 +482,7 @@ export default {
       padding: 0 10px;
       .icon-play-mini, .icon-pause-mini, .icon-playlist
         font-size: 30px;
-        color: $color-theme;
+        color: $color-theme-d;
       .icon-mini
         font-size: 32px;
         position: absolute;
