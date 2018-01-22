@@ -342,7 +342,6 @@ export default {
       this.touch.startY = touch.pageY
     },
     middleTouchMove(e) {
-      console.log('move')
       if (!this.touch.initiated) {
         return
       }
